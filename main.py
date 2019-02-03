@@ -172,18 +172,20 @@ def str_generator(table_data):
     for i in table_data:
         # Класс принимает два аргмента, словрь с данынми о строке, и текущую доску.
         data = Stroka(i, deck)
-        # Обновляем все базовые значения класса.
-        if bool(data.name) != False:
-            data.product_name_update()  # Получаем и обновляем настоящие имя и цену товара.
-
         class_list.append(data)
-
 
     return class_list
 
+def multi_update(obj):
+    if bool(obj.name) != False:
+        obj.product_name_update()
+
 # Фабрика, генератор экземпляров строки.
 factory = str_generator(table_data)
-
+pool1 = ThreadPool(3)
+results1 = pool1.map(multi_update, factory)
+pool1.close()
+pool1.join()
 
 
 # Кластеризуем экземпляры класса, и обновляем сумму.

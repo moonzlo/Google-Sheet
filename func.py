@@ -65,6 +65,7 @@ def group_data(factory_list):
 
 def order_amount(sorted_list, sheet):
     '''Данная функция сумирует все цены, и выводит общую сумму заказа'''
+    kurs = exchange_rate()
 
     summ = []
     for li in sorted_list:
@@ -83,7 +84,7 @@ def order_amount(sorted_list, sheet):
                 format_cell_range(sheet, 'K{}'.format(i.str_number), default_format)
 
                 # Обвноляем данные орг.сбора и конвертация в бел.рубль
-                total = final_price(exchange_rate(), sum(summ))
+                total = final_price(kurs, sum(summ))
 
                 sheet.update_acell('L{}'.format(i.str_number), total)
                 default_format = CellFormat(backgroundColor=color(30, 10, 10), textFormat=textFormat(bold=True))
