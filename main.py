@@ -8,14 +8,17 @@ import json
 import requests
 from bs4 import BeautifulSoup
 from func import *
+from multiprocessing.dummy import Pool as ThreadPool
 
 
+start = time.time()
 def get_html(url):
     agent = 'Mozilla/5.0 (Windows NT 6.0) AppleWebKit/536.5 (KHTML, like Gecko) Chrome/19.0.1084.52 Safari/536.5'
     headers = {'accept': '*/*',
                'user-agent': agent}
     session = requests.Session()  # Иметирует сессию клиента.
     request = session.get(url, headers=headers)
+
 
     return request.content
 
@@ -93,6 +96,8 @@ class Stroka(object):
             # Update in batch
             self.sheet.update_cells(cell_list)
 
+
+
     def product_name_update(self):
         '''Метод получает полное название + цену товара, и обновляет их в параметрах экземпляра класса'''
 
@@ -167,6 +172,7 @@ def_table(deck, leg)
 # Окрашиваем все строки в белый.
 def_color(deck,leg)
 
+
 def str_generator(table_data):
     '''Данная функция служит фабрикой, оборачивая каждую строку таблицы в классы Strok'''
     class_list = []
@@ -193,6 +199,17 @@ klaster = group_data(factory)  # Возвращает список из клас
 order_amount(klaster, deck)  # Подсчитывает суммы, вносит изменения в таблицу.
 
 # Обновляем все строки.
-for st in factory:
-    st.table_update()
-    time.sleep(1)
+pool = ThreadPool(4)     # создаем 4 потока - по количеству ядер CPU
+def multi(elem):
+    elem.table_update()
+
+results = pool.map(multi, factory)
+pool.close()
+pool.join()
+
+
+
+# for st in factory:
+#     st.table_update()
+
+print(time.time() - start)

@@ -30,7 +30,6 @@ def final_price(exchange_rate, rub):
 
 
 def get_htmls():
-    # url = 'https://www.sima-land.ru/3295133'
     url = 'https://rub.ru.currencyrate.today/byn'
 
     headers = {'accept': '*/*',
@@ -109,11 +108,10 @@ def removal(table_data):
 
 def def_color(deck, table_data):
     '''Данная функция сулжит для предварительного окраса всех строк в белый цвет'''
-    for i in table_data:
-        num = len(table_data) + 1
-        table_numbers = 'A6:M{}'.format(num)
-        default_format = CellFormat(backgroundColor=color(1, 1,1), textFormat=textFormat(bold=False))
-        format_cell_range(deck, table_numbers, default_format)
+    num = len(table_data)
+    table_numbers = 'A6:M{}'.format(num)
+    default_format = CellFormat(backgroundColor=color(1, 1, 1), textFormat=textFormat(bold=False))
+    format_cell_range(deck, table_numbers, default_format)
 
 def def_table(deck, table_data):
     '''Цель данной функции, предварительная очистка всего поля от всех данных'''
