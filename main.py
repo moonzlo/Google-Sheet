@@ -1,12 +1,4 @@
-import gspread
-import time
 from oauth2client.service_account import ServiceAccountCredentials
-import pprint
-from gspread_formatting import *
-import re
-import json
-import requests
-from bs4 import BeautifulSoup
 from func import *
 from multiprocessing.dummy import Pool as ThreadPool
 
@@ -207,9 +199,5 @@ results = pool.map(multi, factory)
 pool.close()
 pool.join()
 
-
-
-# for st in factory:
-#     st.table_update()
 
 print(time.time() - start)

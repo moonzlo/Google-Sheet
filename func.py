@@ -1,7 +1,7 @@
 from gspread_formatting import *
 from bs4 import BeautifulSoup
 from operator import itemgetter
-import requests, json, time
+import requests, json, time, gspread
 
 
 def exchange_rate():
