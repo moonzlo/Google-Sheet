@@ -2,7 +2,7 @@ from gspread_formatting import *
 from bs4 import BeautifulSoup
 from operator import itemgetter
 import requests, json, time, gspread
-
+from multiprocessing.dummy import Pool as ThreadPool
 
 def exchange_rate():
     '''Получает актуальный курс рос.рубля к бел.рублю'''
@@ -67,28 +67,65 @@ def order_amount(sorted_list, sheet):
     '''Данная функция сумирует все цены, и выводит общую сумму заказа'''
     kurs = exchange_rate()
 
-    summ = []
-    for li in sorted_list:
+    def core(li):
+        SUM = 0
         for i in li:
+
             if bool(i.name) != False:
 
                 vale = str(i.unit_item).strip()
                 amount = i.item_value
                 summin = int(amount) * int(vale)
-                summ.append(summin)
+                SUM += summin
+
 
             else:
                 # Обновляем итог, красим ячейку в дефолтный цвет и выделяем жиром.
-                sheet.update_acell('K{}'.format(i.str_number), sum(summ))
+                sheet.update_acell('K{}'.format(i.str_number), SUM)
+
                 default_format = CellFormat(backgroundColor=color(30, 10, 10), textFormat=textFormat(bold=True))
                 format_cell_range(sheet, 'K{}'.format(i.str_number), default_format)
 
                 # Обвноляем данные орг.сбора и конвертация в бел.рубль
-                total = final_price(kurs, sum(summ))
+                total = final_price(kurs, SUM)
 
                 sheet.update_acell('L{}'.format(i.str_number), total)
                 default_format = CellFormat(backgroundColor=color(30, 10, 10), textFormat=textFormat(bold=True))
                 format_cell_range(sheet, 'L{}'.format(i.str_number), default_format)
+                SUM = 0
+
+    pool1 = ThreadPool(4)
+    results1 = pool1.map(core, sorted_list)
+    pool1.close()
+    pool1.join()
+
+
+    # for li in sorted_list:
+    #
+    #     SUM = 0
+    #     for i in li:
+    #
+    #         if bool(i.name) != False:
+    #
+    #             vale = str(i.unit_item).strip()
+    #             amount = i.item_value
+    #             summin = int(amount) * int(vale)
+    #             SUM += summin
+    #
+    #
+    #         else:
+    #             # Обновляем итог, красим ячейку в дефолтный цвет и выделяем жиром.
+    #             sheet.update_acell('K{}'.format(i.str_number), SUM)
+    #
+    #             default_format = CellFormat(backgroundColor=color(30, 10, 10), textFormat=textFormat(bold=True))
+    #             format_cell_range(sheet, 'K{}'.format(i.str_number), default_format)
+    #
+    #             # Обвноляем данные орг.сбора и конвертация в бел.рубль
+    #             total = final_price(kurs, SUM)
+    #
+    #             sheet.update_acell('L{}'.format(i.str_number), total)
+    #             default_format = CellFormat(backgroundColor=color(30, 10, 10), textFormat=textFormat(bold=True))
+    #             format_cell_range(sheet, 'L{}'.format(i.str_number), default_format)
 
 
 def removal(table_data):
