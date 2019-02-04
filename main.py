@@ -98,7 +98,7 @@ class Stroka(object):
         data = sopchik(html)
         table_numbers = 'A{}:M{}'.format(self.str_number, self.str_number)
 
-        if data[0] == True:
+        if bool(data[2]) == True:
             # Если тэг Товар партнёра Найден, окрашивает в берюзовый всю строку.
             default_format = CellFormat(backgroundColor=color(250, 10, 10), textFormat=textFormat(bold=False))
             format_cell_range(self.sheet, table_numbers, default_format)
@@ -111,15 +111,9 @@ class Stroka(object):
             a = re.findall(r'\d+', '{}'.format(price))
             num = str().join(a)
             self.unit_item = int(num)
+            self.items_name = data[0]
 
-            price_name = data[2]
-            for i in price_name:
-                self.items_name = i
-
-
-
-            status = data[3]
-            if status == 'Нет в наличии':
+            if bool(data[3]) == True:
                 default_format = CellFormat(backgroundColor=color(1, 0, 240), textFormat=textFormat(bold=False))
                 format_cell_range(self.sheet, table_numbers, default_format)
 
@@ -135,11 +129,8 @@ class Stroka(object):
 
 # -----------------ЗАПУСК
 deck = get_sheet()
-with open('iter_sort.json', 'r') as file:
-    data = json.load(file)
 
-leg = data
-# leg = deck.get_all_records()  # Список внутри которого словари (количество словареий равно кличеству строк)
+leg = deck.get_all_records()  # Список внутри которого словари (количество словареий равно кличеству строк)
 mass = leg[4:]  # Пропускаем пустые строки
 
 deleter = removal(mass)
