@@ -1,28 +1,65 @@
+#!/venv/bin/ python
 from gspread_formatting import *
-from bs4 import BeautifulSoup
+import html5lib
 from operator import itemgetter
 import requests, json, time, gspread
 from multiprocessing.dummy import Pool as ThreadPool
+import gc
+
+def sopchik(html):
+    value = []
+
+    doc = html5lib.parse(html, treebuilder="lxml", namespaceHTMLElements=False)
+
+    # for node in doc.iterfind("//*[@itemprop='name'"):
+    #     print(node.text)
+
+    # Название товара
+    for node in doc.iterfind("//*h1"):
+        value.append(node.text)
+
+    #  Цена
+    price = []
+
+    for node in doc.iterfind("//*td/div/span/span"):
+        price.append(node.text)
+
+    value.append(price[0])
+
+    # Товар партнёра
+    partner = ''
+    for node in doc.iterfind("//*span[@class='flag flag_black remote-item-flag js-item-prop']"):
+        partner = ' '.join(node.text.split())
+
+    value.append(partner)
+
+    # Проверям наличие
+    nalichie = ''
+    for node in doc.iterfind("//*td[@class='a_m purchase__cell purchase__cell_zero']"):
+        nalichie = ' '.join(node.text.split())
+
+    value.append(nalichie)
+
+    return value
+
 
 def exchange_rate():
     '''Получает актуальный курс рос.рубля к бел.рублю'''
     html = get_htmls()
-    soup = BeautifulSoup(html, 'html.parser')
+    value = []
 
-    tag = soup.find_all('span', class_='cc-result')
-    a = tag[1].text.strip()
+    doc = html5lib.parse(html, treebuilder="lxml", namespaceHTMLElements=False)
+    for node in doc.iterfind("//*span[@class='cc-result']"):
+        value.append(node.text)
 
-    b = re.findall(r'[0-9.]', '{}'.format(a))
-    num = str().join(b)
-    number = float(num)
-
-    return number
+    kurs = value[1].split()
+    return kurs[0]
 
 
 
 def final_price(exchange_rate, rub):
 
-    price = exchange_rate*rub
+    price = float(exchange_rate)*rub
 
     procent = price / 100 * 8
     total = int(price) + int(procent)
@@ -66,66 +103,30 @@ def group_data(factory_list):
 def order_amount(sorted_list, sheet):
     '''Данная функция сумирует все цены, и выводит общую сумму заказа'''
     kurs = exchange_rate()
-
-    def core(li):
-        SUM = 0
+    summ = []
+    for li in sorted_list:
         for i in li:
-
             if bool(i.name) != False:
 
                 vale = str(i.unit_item).strip()
                 amount = i.item_value
                 summin = int(amount) * int(vale)
-                SUM += summin
-
+                summ.append(summin)
 
             else:
                 # Обновляем итог, красим ячейку в дефолтный цвет и выделяем жиром.
-                sheet.update_acell('K{}'.format(i.str_number), SUM)
-
+                sheet.update_acell('K{}'.format(i.str_number), sum(summ))
                 default_format = CellFormat(backgroundColor=color(30, 10, 10), textFormat=textFormat(bold=True))
                 format_cell_range(sheet, 'K{}'.format(i.str_number), default_format)
+                time.sleep(1)
 
                 # Обвноляем данные орг.сбора и конвертация в бел.рубль
-                total = final_price(kurs, SUM)
+                total = final_price(exchange_rate(), sum(summ))
 
                 sheet.update_acell('L{}'.format(i.str_number), total)
                 default_format = CellFormat(backgroundColor=color(30, 10, 10), textFormat=textFormat(bold=True))
                 format_cell_range(sheet, 'L{}'.format(i.str_number), default_format)
-                SUM = 0
-
-    pool1 = ThreadPool(4)
-    results1 = pool1.map(core, sorted_list)
-    pool1.close()
-    pool1.join()
-
-
-    # for li in sorted_list:
-    #
-    #     SUM = 0
-    #     for i in li:
-    #
-    #         if bool(i.name) != False:
-    #
-    #             vale = str(i.unit_item).strip()
-    #             amount = i.item_value
-    #             summin = int(amount) * int(vale)
-    #             SUM += summin
-    #
-    #
-    #         else:
-    #             # Обновляем итог, красим ячейку в дефолтный цвет и выделяем жиром.
-    #             sheet.update_acell('K{}'.format(i.str_number), SUM)
-    #
-    #             default_format = CellFormat(backgroundColor=color(30, 10, 10), textFormat=textFormat(bold=True))
-    #             format_cell_range(sheet, 'K{}'.format(i.str_number), default_format)
-    #
-    #             # Обвноляем данные орг.сбора и конвертация в бел.рубль
-    #             total = final_price(kurs, SUM)
-    #
-    #             sheet.update_acell('L{}'.format(i.str_number), total)
-    #             default_format = CellFormat(backgroundColor=color(30, 10, 10), textFormat=textFormat(bold=True))
-    #             format_cell_range(sheet, 'L{}'.format(i.str_number), default_format)
+                time.sleep(1)
 
 
 def removal(table_data):
