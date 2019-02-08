@@ -3,7 +3,7 @@ from gspread_formatting import *
 import html5lib
 from operator import itemgetter
 import requests, json, time, gspread
-from multiprocessing.dummy import Pool as ThreadPool
+from multiprocessing.dummy import Pool
 import gc
 
 def sopchik(html):
@@ -40,6 +40,17 @@ def sopchik(html):
 
     value.append(nalichie)
 
+    ostat_tovara = ''
+    # Проверка статуса наличия (окраска)
+    for node in doc.iterfind("//*td[@class='a_m purchase__cell purchase__cell_qt-have']"):
+        ostat_tovara = node.text
+
+    if bool(ostat_tovara) == True:
+        value.append(ostat_tovara)
+    else:
+        value.append(' ')
+
+    print(len(value))
     return value
 
 
@@ -100,33 +111,42 @@ def group_data(factory_list):
 
 # Запускать в самом конце.
 
-def order_amount(sorted_list, sheet):
+def order_amount(sorted_list):
     '''Данная функция сумирует все цены, и выводит общую сумму заказа'''
     kurs = exchange_rate()
-    summ = []
-    for li in sorted_list:
+
+
+    def core(li):
+        SUM = 0
         for i in li:
+            sheet = i.sheet
+
             if bool(i.name) != False:
 
                 vale = str(i.unit_item).strip()
                 amount = i.item_value
                 summin = int(amount) * int(vale)
-                summ.append(summin)
+                SUM += summin
+
 
             else:
-                # Обновляем итог, красим ячейку в дефолтный цвет и выделяем жиром.
-                sheet.update_acell('K{}'.format(i.str_number), sum(summ))
-                default_format = CellFormat(backgroundColor=color(30, 10, 10), textFormat=textFormat(bold=True))
-                format_cell_range(sheet, 'K{}'.format(i.str_number), default_format)
-                time.sleep(1)
 
-                # Обвноляем данные орг.сбора и конвертация в бел.рубль
-                total = final_price(exchange_rate(), sum(summ))
+                total = final_price(kurs, SUM)
+                namers = [SUM, total]
 
-                sheet.update_acell('L{}'.format(i.str_number), total)
+                cell_list = i.sheet.range('K{}:L{}'.format(i.str_number, i.str_number))
+                for cell, name in zip(cell_list, namers):
+                    cell.value = name
+
+                i.sheet.update_cells(cell_list)
+                time.sleep(0.2)
+
                 default_format = CellFormat(backgroundColor=color(30, 10, 10), textFormat=textFormat(bold=True))
-                format_cell_range(sheet, 'L{}'.format(i.str_number), default_format)
-                time.sleep(1)
+                format_cell_range(sheet, 'K{}:L{}'.format(i.str_number, i.str_number), default_format)
+                SUM = 0
+
+    with Pool(2) as p:
+        p.map(core, sorted_list)
 
 
 def removal(table_data):

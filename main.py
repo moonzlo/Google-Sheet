@@ -20,12 +20,12 @@ def get_html(url):
     return request.content
 
 
-def get_sheet():
+def get_sheet(tokken):
     '''отдаёт список с словарями, количество словарей равно количесту заполненных строк'''
 
     scope = ['https://www.googleapis.com/auth/drive']
 
-    creds = ServiceAccountCredentials.from_json_keyfile_name('login.json', scope)
+    creds = ServiceAccountCredentials.from_json_keyfile_name(tokken, scope)
     client = gspread.authorize(creds)
 
     sheet = client.open('test1').sheet1
@@ -50,6 +50,7 @@ class Stroka(object):
 
 
         self.sheet = deck  # Объект доски.
+
         self.time = dictionary.get('Отметка времени')
         self.name = dictionary.get('Фамилия и имя')
         self.doing = dictionary.get('Дейсвтие')
@@ -72,6 +73,7 @@ class Stroka(object):
 
     def table_update(self):
         '''Данный метод записывает данные непосредственно в таблицу'''
+        time.sleep(0.2)
 
         namers = [self.time, self.name, self.doing, self.items_name, self.article, self.item_url, self.unit_item,
                   self.item_value, self.min_value, self.delivery, '', '', self.notice]
@@ -118,19 +120,30 @@ class Stroka(object):
                 format_cell_range(self.sheet, table_numbers, default_format)
 
 
+
         except AttributeError:
             self.unit_item = 'Ошибка'
             self.items_name = 'Ошибка артикла'
 
+
+        # status = data[4]
+        #
+        # if status == 'На складе достаточно':
+        #     pass
 
 
 
 
 
 # -----------------ЗАПУСК
-deck = get_sheet()
+login1 = 'login.json'
+login2 = 'login2.json'
 
-leg = deck.get_all_records()  # Список внутри которого словари (количество словареий равно кличеству строк)
+
+deck1 = get_sheet(login1)
+deck2 = get_sheet(login2)
+
+leg = deck1.get_all_records()  # Список внутри которого словари (количество словареий равно кличеству строк)
 mass = leg[4:]  # Пропускаем пустые строки
 
 deleter = removal(mass)
@@ -140,10 +153,10 @@ deleter = removal(mass)
 table_data = initor(deleter)  # Получем список словарей (всех строк таблицы)
 
 # Очищаем все строки.
-def_table(deck, leg)
+def_table(deck1, leg)
 
 # Окрашиваем все строки в белый.
-def_color(deck,leg)
+def_color(deck1,leg)
 
 
 
@@ -151,18 +164,24 @@ def str_generator(table_data):
     '''Данная функция служит фабрикой, оборачивая каждую строку таблицы в классы Strok'''
 
     class_list = []
-
+    vibor = int(0)
     for i in table_data:
-        # Класс принимает два аргмента, словрь с данынми о строке, и текущую доску.
-        data = Stroka(i, deck)
-        class_list.append(data)
+        if vibor != 1:
+
+            # Класс принимает два аргмента, словрь с данынми о строке, и текущую доску.
+            data = Stroka(i, deck1)
+            class_list.append(data)
+            vibor += 1
+        else:
+            data = Stroka(i, deck2)
+            class_list.append(data)
+            vibor = 0
 
 
     return class_list
 
 def multi_update(obj):
     if bool(obj.name) != False:
-        import sys
         obj.product_name_update()
 
 
@@ -177,15 +196,17 @@ with Pool(3) as p:
 
 # Кластеризуем экземпляры класса, и обновляем сумму.
 klaster = group_data(factory)  # Возвращает список из кластеров (экземпляров класса). [[Вася пупкин],[Вася Петров]]
-order_amount(klaster, deck)  # Подсчитывает суммы, вносит изменения в таблицу.
+
+
+order_amount(klaster)  # Подсчитывает суммы, вносит изменения в таблицу.
 
 # Обновляем все строки.
 
 def multi(elem):
     elem.table_update()
-    time.sleep(1)
 
-with Pool(3) as p:
+
+with Pool(2) as p:
     p.map(multi, factory)
 
 
