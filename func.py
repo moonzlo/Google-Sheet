@@ -1,10 +1,39 @@
-#!/venv/bin/ python
 from gspread_formatting import *
 import html5lib
 from operator import itemgetter
 import requests, json, time, gspread
 from multiprocessing.dummy import Pool
-import gc
+from selenium import webdriver
+
+def block_access():  # Блокирует доступ гугл форме.
+    """Смысл функции ограничить возмонжость клиентов добавлять контент, во время работы скрипта"""
+
+    options = webdriver.ChromeOptions()
+    options.add_argument('headless')  # Без GUI
+    options.add_argument('--no-sandbox')
+    options.add_argument('--disable-dev-shm-usage')
+    options.add_argument(r"user-data-dir=/home/moonz/git/Google-Sheet/profile/")
+    driver = webdriver.Chrome(executable_path="/home/moonz/chromedriver", chrome_options=options)
+
+    # Адресс формы
+    driver.get("https://docs.google.com/forms/d/14xEH6imVJgBJKndemdysvTu9olMJEzv0cz62y9ziBdw/edit#responses")
+
+
+
+    try:
+        time.sleep(2)
+        driver.find_element_by_xpath(u"(.//*[normalize-space(text()) and normalize-space(.)='Принимать ответы'])[1]/following::div[6]").click()
+
+
+    except Exception as error:
+        print('ОШИБКА ! | ',error)
+
+    finally:
+        driver.close()
+        time.sleep(2)
+        driver.quit()
+        time.sleep(2)
+
 
 def sopchik(html):
     value = []
@@ -145,7 +174,7 @@ def order_amount(sorted_list):
                 format_cell_range(sheet, 'K{}:L{}'.format(i.str_number, i.str_number), default_format)
                 SUM = 0
 
-    with Pool(2) as p:
+    with Pool(3) as p:
         p.map(core, sorted_list)
 
 

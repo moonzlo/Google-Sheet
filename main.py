@@ -2,7 +2,6 @@
 
 from oauth2client.service_account import ServiceAccountCredentials
 from func import *
-
 from multiprocessing.dummy import Pool
 import gc
 
@@ -14,25 +13,23 @@ def get_html(url):
     headers = {'accept': '*/*',
                'user-agent': agent}
     session = requests.Session()  # Иметирует сессию клиента.
-    request = session.get(url, headers=headers)
+    try:
+        request = session.get(url, headers=headers, timeout=1)
 
+    except Exception as error:
+        time.sleep(1)
+        request = session.get(url)
 
     return request.content
 
 
 def get_sheet(tokken):
-    '''отдаёт список с словарями, количество словарей равно количесту заполненных строк'''
+    '''отдаёт экземпляр доски, полученый по токкену'''
 
     scope = ['https://www.googleapis.com/auth/drive']
-
     creds = ServiceAccountCredentials.from_json_keyfile_name(tokken, scope)
     client = gspread.authorize(creds)
-
     sheet = client.open('test1').sheet1
-
-    leg = sheet.get_all_records()  # Список внутри которого словари (количество словареий равно кличеству строк)
-    mass = leg[4:]  # Пропускаем пустые строки
-
     return sheet
 
 
@@ -136,12 +133,15 @@ class Stroka(object):
 
 
 # -----------------ЗАПУСК
-login1 = 'login.json'
-login2 = 'login2.json'
+block_access()
 
+login1 = 'login1.json'
+login2 = 'login2.json'
+login3 = 'login3.json'
 
 deck1 = get_sheet(login1)
 deck2 = get_sheet(login2)
+deck3 = get_sheet(login3)
 
 leg = deck1.get_all_records()  # Список внутри которого словари (количество словареий равно кличеству строк)
 mass = leg[4:]  # Пропускаем пустые строки
@@ -166,14 +166,18 @@ def str_generator(table_data):
     class_list = []
     vibor = int(0)
     for i in table_data:
-        if vibor != 1:
+        if vibor == 0:
 
-            # Класс принимает два аргмента, словрь с данынми о строке, и текущую доску.
             data = Stroka(i, deck1)
             class_list.append(data)
             vibor += 1
-        else:
+        elif vibor == 1:
             data = Stroka(i, deck2)
+            class_list.append(data)
+            vibor += 1
+
+        else:
+            data = Stroka(i, deck3)
             class_list.append(data)
             vibor = 0
 
@@ -206,9 +210,9 @@ def multi(elem):
     elem.table_update()
 
 
-with Pool(2) as p:
+with Pool(3) as p:
     p.map(multi, factory)
 
 
-
+block_access()
 print(time.time() - start)
