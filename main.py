@@ -88,39 +88,31 @@ class Stroka(object):
 
 
 
-    def product_name_update(self):
-        '''Метод получает полное название + цену товара, и обновляет их в параметрах экземпляра класса'''
-
-        base = 'https://www.sima-land.ru/{}'.format(self.article)
-        html = get_html(base)
-
-        data = sopchik(html)
+    def product_name_update(self, sort_dict):
+        """Данный метод получает данные о товаре (если он в наличии) обновляет"""
         table_numbers = 'A{}:M{}'.format(self.str_number, self.str_number)
+        arrticle = int(self.article)
 
-        if bool(data[2]) == True:
-            # Если тэг Товар партнёра Найден, окрашивает в берюзовый всю строку.
-            default_format = CellFormat(backgroundColor=color(250, 10, 10), textFormat=textFormat(bold=False))
-            format_cell_range(self.sheet, table_numbers, default_format)
+        if arrticle in sort_dict:
+            data = sort_dict.get(arrticle)
 
+            #  Обвноляем цену
+            self.unit_item = data.get('price')
+            self.items_name = data.get('name')
 
-        # Обновляем название и цену
-        try:
-            price = data[1]
-
-            a = re.findall(r'\d+', '{}'.format(price))
-            num = str().join(a)
-            self.unit_item = int(num)
-            self.items_name = data[0]
-
-            if bool(data[3]) == True:
-                default_format = CellFormat(backgroundColor=color(1, 0, 240), textFormat=textFormat(bold=False))
+            # Проверка на товар партнёра
+            if data.get('is_remote_store') == 1:
+                default_format = CellFormat(backgroundColor=color(250, 10, 10), textFormat=textFormat(bold=False))
                 format_cell_range(self.sheet, table_numbers, default_format)
+                time.sleep(0.6)
 
+        else:
+            #  Если товар НЕ найден в списке артиклов, значит его НЕТ в наличии.
+            self.unit_item = 0
+            default_format = CellFormat(backgroundColor=color(1, 0, 240), textFormat=textFormat(bold=True))
+            format_cell_range(self.sheet, table_numbers, default_format)
+            time.sleep(0.6)
 
-
-        except AttributeError:
-            self.unit_item = 'Ошибка'
-            self.items_name = 'Ошибка артикла'
 
 
         # status = data[4]
@@ -133,18 +125,21 @@ class Stroka(object):
 
 
 # -----------------ЗАПУСК
-block_access()
+# block_access()
 
 login1 = 'login1.json'
 login2 = 'login2.json'
 login3 = 'login3.json'
+login4 = 'login4.json'
 
 deck1 = get_sheet(login1)
 deck2 = get_sheet(login2)
 deck3 = get_sheet(login3)
+deck4 = get_sheet(login4)
 
 leg = deck1.get_all_records()  # Список внутри которого словари (количество словареий равно кличеству строк)
 mass = leg[4:]  # Пропускаем пустые строки
+
 
 deleter = removal(mass)
 
@@ -167,7 +162,6 @@ def str_generator(table_data):
     vibor = int(0)
     for i in table_data:
         if vibor == 0:
-
             data = Stroka(i, deck1)
             class_list.append(data)
             vibor += 1
@@ -176,25 +170,34 @@ def str_generator(table_data):
             class_list.append(data)
             vibor += 1
 
-        else:
+        elif vibor == 2:
             data = Stroka(i, deck3)
+            class_list.append(data)
+            vibor += 1
+
+        else:
+            data = Stroka(i, deck4)
             class_list.append(data)
             vibor = 0
 
 
     return class_list
 
-def multi_update(obj):
-    if bool(obj.name) != False:
-        obj.product_name_update()
-
-
-
 # Фабрика, генератор экземпляров строки.
 factory = str_generator(table_data)
 
 
-with Pool(3) as p:
+sorted_dict = get_goods_data(factory)
+
+
+
+def multi_update(obj):
+    if bool(obj.name) != False:
+        obj.product_name_update(sorted_dict)
+
+
+
+with Pool(4) as p:
     p.map(multi_update, factory)
 
 
@@ -210,9 +213,9 @@ def multi(elem):
     elem.table_update()
 
 
-with Pool(3) as p:
+with Pool(4) as p:
     p.map(multi, factory)
 
 
-block_access()
+# block_access()
 print(time.time() - start)

@@ -4,6 +4,43 @@ from operator import itemgetter
 import requests, json, time, gspread
 from multiprocessing.dummy import Pool
 from selenium import webdriver
+from requests_xml import XMLSession
+
+import pdb
+
+def sid_gener(str_list):
+    '''Генерирует список из артиклов, для передачи в реквест'''
+    sid_list = []
+
+    for i in str_list:
+        a = i.article
+        if a != ' ':
+            sid_list.append(str(a))
+
+    good = ','.join(sid_list)
+
+    return good
+
+def get_goods_data(obj_list):
+    """Получаем и обрабатываем данные с api сималэнда по списку артиклов, отдаём список товаров в НАЛИЧИИ"""
+
+    sids = sid_gener(obj_list)
+    session = XMLSession()
+    r = session.get('https://www.sima-land.ru/api/v3/item/?per-page=?&sid={}'.format(sids))
+    a = r.json()  # Словаря с данными
+    sort = []
+    for i in a.get('items'):
+        sort.append(i)
+
+    dict_sort = {}
+
+    for x in sort:
+        sid = x.get('sid')
+        value = {sid: x}
+        dict_sort.update(value)
+
+    return dict_sort
+
 
 def block_access():  # Блокирует доступ гугл форме.
     """Смысл функции ограничить возмонжость клиентов добавлять контент, во время работы скрипта"""
@@ -102,7 +139,7 @@ def final_price(exchange_rate, rub):
     price = float(exchange_rate)*rub
 
     procent = price / 100 * 8
-    total = int(price) + int(procent)
+    total = float(price) + float(procent)
     return total
 
 
@@ -154,7 +191,7 @@ def order_amount(sorted_list):
 
                 vale = str(i.unit_item).strip()
                 amount = i.item_value
-                summin = int(amount) * int(vale)
+                summin = float(amount) * float(vale)
                 SUM += summin
 
 
@@ -174,7 +211,7 @@ def order_amount(sorted_list):
                 format_cell_range(sheet, 'K{}:L{}'.format(i.str_number, i.str_number), default_format)
                 SUM = 0
 
-    with Pool(3) as p:
+    with Pool(4) as p:
         p.map(core, sorted_list)
 
 
