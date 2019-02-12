@@ -5,22 +5,7 @@ from func import *
 from multiprocessing.dummy import Pool
 import gc
 
-
-
 start = time.time()
-def get_html(url):
-    agent = 'Mozilla/5.0 (Windows NT 6.0) AppleWebKit/536.5 (KHTML, like Gecko) Chrome/19.0.1084.52 Safari/536.5'
-    headers = {'accept': '*/*',
-               'user-agent': agent}
-    session = requests.Session()  # Иметирует сессию клиента.
-    try:
-        request = session.get(url, headers=headers, timeout=1)
-
-    except Exception as error:
-        time.sleep(1)
-        request = session.get(url)
-
-    return request.content
 
 
 def get_sheet(tokken):
@@ -64,9 +49,7 @@ class Stroka(object):
         self.notice = dictionary.get('Примечание')
         self.delivery = dictionary.get('Цена за доставку (если есть)')
         self.str_number = dictionary.get('Строка')
-
-        # self.klaster = dictionary.get(keys[13])  # Параметр для заглушки, хранит имя кластера
-
+        self.status = dictionary.get('Статус заказа')
 
     def table_update(self):
         '''Данный метод записывает данные непосредственно в таблицу'''
@@ -96,6 +79,9 @@ class Stroka(object):
         if arrticle in sort_dict:
             data = sort_dict.get(arrticle)
 
+            # Правильная ссылка на товар
+            self.item_url = f'https://www.sima-land.ru/{self.article}'
+
             #  Обвноляем цену, имя, и минимальный выкуп
             self.unit_item = data.get('price')
             self.items_name = data.get('name')
@@ -109,27 +95,52 @@ class Stroka(object):
                 else:
                     self.delivery = 'Платная'
 
+            # Проверка на выкуп
+            def sverka(article, min_value, item_value):
+                artikl = article
+                min = min_value.split()
+
+                all_art = 0
+                all_art += item_value
+
+                for i in factory:
+                    
+                    if i.article == artikl:  # Ищем такой же артикл в таблице.
+                        # Если нашли совпадение по артиклу, добавим столько сколько хочет купить человек
+                        all_art += int(i.item_value)
+
+                if all_art >= int(min[1]):
+                    return True
+
+                elif int(min[1]) == 1:
+                    return True
+
+                else:
+                    return False
+
+            # Проверка, достаточно ли товара для выкупа.
+            status = sverka(self.article, self.min_value, self.item_value)
+
+            if status == False:
+                # Если НЕ хватает для выкупа.
+                default_format = CellFormat(backgroundColor=color(1, 2, 0), textFormat=textFormat(bold=False))
+                format_cell_range(self.sheet, table_numbers, default_format)
+                time.sleep(0.6)
 
             # Проверка на товар партнёра
-            if data.get('is_remote_store') == 1:
+            elif data.get('is_remote_store') == 1:
                 default_format = CellFormat(backgroundColor=color(250, 10, 10), textFormat=textFormat(bold=False))
                 format_cell_range(self.sheet, table_numbers, default_format)
                 time.sleep(0.6)
 
+
+
         else:
             #  Если товар НЕ найден в списке артиклов, значит его НЕТ в наличии.
             self.unit_item = 0
-            default_format = CellFormat(backgroundColor=color(1, 0, 240), textFormat=textFormat(bold=True))
+            default_format = CellFormat(backgroundColor=color(10, 0, 0), textFormat=textFormat(bold=True))
             format_cell_range(self.sheet, table_numbers, default_format)
             time.sleep(0.6)
-
-
-
-        # status = data[4]
-        #
-        # if status == 'На складе достаточно':
-        #     pass
-
 
 
 
@@ -201,7 +212,9 @@ sorted_dict = get_goods_data(factory)
 
 
 
+
 def multi_update(obj):
+
     if bool(obj.name) != False:
         obj.product_name_update(sorted_dict)
 
