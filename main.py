@@ -96,9 +96,19 @@ class Stroka(object):
         if arrticle in sort_dict:
             data = sort_dict.get(arrticle)
 
-            #  Обвноляем цену
+            #  Обвноляем цену, имя, и минимальный выкуп
             self.unit_item = data.get('price')
             self.items_name = data.get('name')
+            self.min_value = data.get('qty_rules')
+
+            # Проверка цены за доставку, если НЕ указана то проверям статус.
+            if bool(self.delivery) == False:
+                deli_status = data.get('is_free_delivery')
+                if deli_status == True:
+                    self.delivery = 'Бесплатная'
+                else:
+                    self.delivery = 'Платная'
+
 
             # Проверка на товар партнёра
             if data.get('is_remote_store') == 1:

@@ -58,7 +58,6 @@ def block_access():  # Блокирует доступ гугл форме.
 
 
     try:
-        time.sleep(2)
         driver.find_element_by_xpath(u"(.//*[normalize-space(text()) and normalize-space(.)='Принимать ответы'])[1]/following::div[6]").click()
 
 
@@ -67,57 +66,7 @@ def block_access():  # Блокирует доступ гугл форме.
 
     finally:
         driver.close()
-        time.sleep(2)
         driver.quit()
-        time.sleep(2)
-
-
-def sopchik(html):
-    value = []
-
-    doc = html5lib.parse(html, treebuilder="lxml", namespaceHTMLElements=False)
-
-    # for node in doc.iterfind("//*[@itemprop='name'"):
-    #     print(node.text)
-
-    # Название товара
-    for node in doc.iterfind("//*h1"):
-        value.append(node.text)
-
-    #  Цена
-    price = []
-
-    for node in doc.iterfind("//*td/div/span/span"):
-        price.append(node.text)
-
-    value.append(price[0])
-
-    # Товар партнёра
-    partner = ''
-    for node in doc.iterfind("//*span[@class='flag flag_black remote-item-flag js-item-prop']"):
-        partner = ' '.join(node.text.split())
-
-    value.append(partner)
-
-    # Проверям наличие
-    nalichie = ''
-    for node in doc.iterfind("//*td[@class='a_m purchase__cell purchase__cell_zero']"):
-        nalichie = ' '.join(node.text.split())
-
-    value.append(nalichie)
-
-    ostat_tovara = ''
-    # Проверка статуса наличия (окраска)
-    for node in doc.iterfind("//*td[@class='a_m purchase__cell purchase__cell_qt-have']"):
-        ostat_tovara = node.text
-
-    if bool(ostat_tovara) == True:
-        value.append(ostat_tovara)
-    else:
-        value.append(' ')
-
-    print(len(value))
-    return value
 
 
 def exchange_rate():
@@ -133,14 +82,16 @@ def exchange_rate():
     return kurs[0]
 
 
-
 def final_price(exchange_rate, rub):
+
 
     price = float(exchange_rate)*rub
 
     procent = price / 100 * 8
     total = float(price) + float(procent)
-    return total
+
+    test = '%.2f' % total
+    return test
 
 
 def get_htmls():
@@ -183,30 +134,35 @@ def order_amount(sorted_list):
 
 
     def core(li):
+
         SUM = 0
         for i in li:
+            deliver = i.delivery
             sheet = i.sheet
 
             if bool(i.name) != False:
 
-                vale = str(i.unit_item).strip()
-                amount = i.item_value
-                summin = float(amount) * float(vale)
-                SUM += summin
+                if type(deliver) == int:
+
+                    vale = str(i.unit_item).strip()
+                    amount = i.item_value
+                    summin = float(amount) * float(vale)
+                    SUM += summin + deliver
+                else:
+                    vale = str(i.unit_item).strip()
+                    amount = i.item_value
+                    summin = float(amount) * float(vale)
+                    SUM += summin
 
 
             else:
-
                 total = final_price(kurs, SUM)
                 namers = [SUM, total]
-
                 cell_list = i.sheet.range('K{}:L{}'.format(i.str_number, i.str_number))
                 for cell, name in zip(cell_list, namers):
                     cell.value = name
-
                 i.sheet.update_cells(cell_list)
                 time.sleep(0.2)
-
                 default_format = CellFormat(backgroundColor=color(30, 10, 10), textFormat=textFormat(bold=True))
                 format_cell_range(sheet, 'K{}:L{}'.format(i.str_number, i.str_number), default_format)
                 SUM = 0
