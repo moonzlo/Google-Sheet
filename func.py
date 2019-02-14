@@ -6,30 +6,74 @@ from multiprocessing.dummy import Pool
 from selenium import webdriver
 from requests_xml import XMLSession
 
-import pdb
+
 
 def sid_gener(str_list):
-    '''Генерирует список из артиклов, для передачи в реквест'''
+    """Генерирует список из артиклов, для передачи в реквест"""
+    s = str_list.copy()
+
     sid_list = []
 
-    for i in str_list:
-        a = i.article
-        if a != ' ':
-            sid_list.append(str(a))
+    try:
+        for x in s:
+            if bool(x.name) == True:
+                sid_list.append(x.article)
 
-    good = ','.join(sid_list)
+        # Удаляем дубликаты артиклов.
+        value = set(sid_list)
+        value1 = list(value)
 
-    return good
+        return value1
+
+    except Exception as error:
+        print(error)
+
+
+
+
+def sima_api(spisok_sto):
+    session = XMLSession()
+    r = session.get('https://www.sima-land.ru/api/v3/item/?per-page=?&sid={}'.format(spisok_sto))
+    a = r.json()  # Словаря с данными
+
+    return a
+
+
+def art_sort(artikles):
+    """Сортируем артиклы в список по сто штук"""
+    schetcik = 0
+    spisok = []
+    value = []
+
+    for i in artikles:
+        if schetcik != 1000:
+            spisok.append(i)
+            schetcik += 1
+        else:
+            value.append(','.join(spisok))
+            spisok.clear()
+            schetcik = 0
+
+    value.append(spisok)
+
+    return value
 
 def get_goods_data(obj_list):
     """Получаем и обрабатываем данные с api сималэнда по списку артиклов, отдаём список товаров в НАЛИЧИИ"""
 
-    sids = sid_gener(obj_list)
-    session = XMLSession()
-    r = session.get('https://www.sima-land.ru/api/v3/item/?per-page=?&sid={}'.format(sids))
-    a = r.json()  # Словаря с данными
+    stroki = obj_list
+    sids = sid_gener(stroki)   # Получаем все артиклы без дублей
+
+    sort_art = art_sort(sids)  # Сортируем артиклы по 1000
+
+    slovar = {}
+    for x in sort_art:
+        arttiklis = ''.join(str(x).replace(' ', '').replace('[', '').replace(']', ''))
+        data = sima_api(arttiklis)
+        slovar.update(data)
+
     sort = []
-    for i in a.get('items'):
+    for i in slovar.get('items'):
         sort.append(i)
 
     dict_sort = {}
@@ -166,13 +210,31 @@ def order_amount(sorted_list):
                 default_format = CellFormat(backgroundColor=color(30, 10, 10), textFormat=textFormat(bold=True))
                 format_cell_range(sheet, 'K{}:L{}'.format(i.str_number, i.str_number), default_format)
                 SUM = 0
+                time.sleep(0.6)
 
     with Pool(4) as p:
         p.map(core, sorted_list)
 
 
-def removal(table_data):
-    data = table_data
+def def_table(deck, table_data):
+    '''Цель данной функции, предварительная очистка всего поля от всех данных'''
+    stop = len(table_data) + 5
+    value = 'A6:M{}'.format(stop)
+    cell_list = deck.range(value)
+
+    for cell in cell_list:
+        cell.value = ''
+
+    deck.update_cells(cell_list)
+
+    table_numbers = 'A6:M{}'.format(stop)
+    default_format = CellFormat(backgroundColor=color(1, 1, 1), textFormat=textFormat(bold=False))
+    format_cell_range(deck, table_numbers, default_format)
+
+
+def initor(sheet):
+    """Сначала удаляем те данные которые Хотят удалить из таблицы, сми клиенты"""
+    data = sheet
     black = []
 
     for i in data:
@@ -184,33 +246,10 @@ def removal(table_data):
                 if value[0].get('Фамилия и имя') == x.get('Фамилия и имя') and value[0].get('Артикул') == x.get('Артикул'):
                     data.remove(x)
 
-
-    return data
-
-def def_color(deck, table_data):
-    '''Данная функция сулжит для предварительного окраса всех строк в белый цвет'''
-    num = len(table_data)
-    table_numbers = 'A6:M{}'.format(num)
-    default_format = CellFormat(backgroundColor=color(1, 1, 1), textFormat=textFormat(bold=False))
-    format_cell_range(deck, table_numbers, default_format)
-
-def def_table(deck, table_data):
-    '''Цель данной функции, предварительная очистка всего поля от всех данных'''
-    stop = len(table_data) + 1
-    value = 'A6:M{}'.format(stop)
-    cell_list = deck.range(value)
-
-    for cell in cell_list:
-        cell.value = ' '
-
-    deck.update_cells(cell_list)
-
-
-def initor(sheet):
     '''сортирует все данные по алфовиту + добавляет пустые строки в конеце кластера'''
 
     # Получаем отсортированный по именам список. Пустые поля попадают в самый верх.
-    list_of_dicts = sheet
+    list_of_dicts = data
     # list_of_dicts.sort(key=itemgetter('Фамилия и имя'))
     # Убираем все пустые строки, и сортируем по алфовиту.
     new = []
@@ -278,7 +317,7 @@ def initor(sheet):
         nums += 1
 
     # Записываем пронумерованные строки в файл.
-    with open('iter_sort.json', 'w') as file:
-        json.dump(sorted_list, file, indent=2, ensure_ascii=False)
+    # with open('iter_sort.json', 'w') as file:
+    #     json.dump(sorted_list, file, indent=2, ensure_ascii=False)
 
     return sorted_list

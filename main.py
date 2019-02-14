@@ -49,7 +49,7 @@ class Stroka(object):
         self.notice = dictionary.get('Примечание')
         self.delivery = dictionary.get('Цена за доставку (если есть)')
         self.str_number = dictionary.get('Строка')
-        self.status = dictionary.get('Статус заказа')
+        self.status = dictionary.get('Состояние')
 
     def table_update(self):
         '''Данный метод записывает данные непосредственно в таблицу'''
@@ -72,6 +72,7 @@ class Stroka(object):
 
 
     def product_name_update(self, sort_dict):
+
         """Данный метод получает данные о товаре (если он в наличии) обновляет"""
         table_numbers = 'A{}:M{}'.format(self.str_number, self.str_number)
         arrticle = int(self.article)
@@ -104,7 +105,7 @@ class Stroka(object):
                 all_art += item_value
 
                 for i in factory:
-                    
+
                     if i.article == artikl:  # Ищем такой же артикл в таблице.
                         # Если нашли совпадение по артиклу, добавим столько сколько хочет купить человек
                         all_art += int(i.item_value)
@@ -120,19 +121,33 @@ class Stroka(object):
 
             # Проверка, достаточно ли товара для выкупа.
             status = sverka(self.article, self.min_value, self.item_value)
+            try:
+                if bool(self.status) == True:
+                    if int(self.status) == 1:
+                        #  Окращивает линию в зеленый
+                        default_format = CellFormat(backgroundColor=color(250, 10, 0), textFormat=textFormat(bold=False))
+                        format_cell_range(self.sheet, table_numbers, default_format)
+                        time.sleep(0.6)
+                    elif int(self.status) == 2:
 
-            if status == False:
-                # Если НЕ хватает для выкупа.
-                default_format = CellFormat(backgroundColor=color(1, 2, 0), textFormat=textFormat(bold=False))
-                format_cell_range(self.sheet, table_numbers, default_format)
-                time.sleep(0.6)
+                        default_format = CellFormat(backgroundColor=color(100,1,250), textFormat=textFormat(bold=False))
+                        format_cell_range(self.sheet, table_numbers, default_format)
+                        time.sleep(0.6)
 
-            # Проверка на товар партнёра
-            elif data.get('is_remote_store') == 1:
-                default_format = CellFormat(backgroundColor=color(250, 10, 10), textFormat=textFormat(bold=False))
-                format_cell_range(self.sheet, table_numbers, default_format)
-                time.sleep(0.6)
 
+                elif status == False:
+                    # Если НЕ хватает для выкупа.
+                    default_format = CellFormat(backgroundColor=color(1, 2, 0), textFormat=textFormat(bold=False))
+                    format_cell_range(self.sheet, table_numbers, default_format)
+                    time.sleep(0.6)
+
+                # Проверка на товар партнёра
+                elif data.get('is_remote_store') == 1:
+                    default_format = CellFormat(backgroundColor=color(250, 10, 10), textFormat=textFormat(bold=False))
+                    format_cell_range(self.sheet, table_numbers, default_format)
+                    time.sleep(0.6)
+            except:
+                pdb.set_trace()
 
 
         else:
@@ -162,17 +177,8 @@ leg = deck1.get_all_records()  # Список внутри которого сл
 mass = leg[4:]  # Пропускаем пустые строки
 
 
-deleter = removal(mass)
-
-
 # Инициализирует таблицу, записывая отсортированные данные в json iter_sort.json
-table_data = initor(deleter)  # Получем список словарей (всех строк таблицы)
-
-# Очищаем все строки.
-def_table(deck1, leg)
-
-# Окрашиваем все строки в белый.
-def_color(deck1,leg)
+table_data = initor(mass)  # Получем список словарей (всех строк таблицы)
 
 
 
@@ -207,6 +213,8 @@ def str_generator(table_data):
 # Фабрика, генератор экземпляров строки.
 factory = str_generator(table_data)
 
+# Очищаем все строки.
+def_table(deck1, factory)
 
 sorted_dict = get_goods_data(factory)
 
@@ -227,17 +235,63 @@ with Pool(4) as p:
 # Кластеризуем экземпляры класса, и обновляем сумму.
 klaster = group_data(factory)  # Возвращает список из кластеров (экземпляров класса). [[Вася пупкин],[Вася Петров]]
 
+def table_update(table, spisok):
+    try:
+        stop = len(spisok) + 5
+        print(stop)
+        value = f'A6:M{stop}'
+        cell_list = table.range(value)
+        num1 = 0
+        num2 = 0
+
+        for cell in cell_list:
+            stroka = spisok[num1]
+            namers = [stroka.time, stroka.name, stroka.doing, stroka.items_name, stroka.article, stroka.item_url,
+                      stroka.unit_item, stroka.item_value, stroka.min_value, stroka.delivery, '', '', stroka.notice]
+            namers2 = ['', '', '', '', '', '', '', '', '', '', '', '', '', ]
+
+            if bool(namers[1]) == True:
+
+                if num2 != 12:
+                    cell.value = namers[num2]
+                    num2 += 1
+                else:
+                    num2 = 0
+                    num1 += 1
+                    cell.value = namers[12]
+
+            else:
+                if num2 != 12:
+                    cell.value = namers2[num2]
+                    num2 += 1
+                else:
+                    num2 = 0
+                    num1 += 1
+                    cell.value = namers2[12]
+
+
+        table.update_cells(cell_list)
+
+    except Exception as error:
+        print(error)
+
+table_update(deck1, factory)
+
+
 
 order_amount(klaster)  # Подсчитывает суммы, вносит изменения в таблицу.
 
 # Обновляем все строки.
 
-def multi(elem):
-    elem.table_update()
+# def multi(elem):
+#     elem.table_update()
+#
+#
+# with Pool(4) as p:
+#     p.map(multi, factory)
 
 
-with Pool(4) as p:
-    p.map(multi, factory)
+
 
 
 # block_access()
