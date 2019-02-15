@@ -23,6 +23,7 @@ def sid_gener(str_list):
         value = set(sid_list)
         value1 = list(value)
 
+
         return value1
 
     except Exception as error:
@@ -35,7 +36,6 @@ def sima_api(spisok_sto):
     session = XMLSession()
     r = session.get('https://www.sima-land.ru/api/v3/item/?per-page=?&sid={}'.format(spisok_sto))
     a = r.json()  # Словаря с данными
-
     return a
 
 
@@ -46,15 +46,17 @@ def art_sort(artikles):
     value = []
 
     for i in artikles:
-        if schetcik != 1000:
+        if schetcik != 300:
             spisok.append(i)
             schetcik += 1
         else:
-            value.append(','.join(spisok))
-            spisok.clear()
-            schetcik = 0
 
-    value.append(spisok)
+            value.append(str(spisok))
+            schetcik = 0
+            spisok.clear()
+
+
+    value.append(str(spisok))
 
     return value
 
@@ -64,13 +66,15 @@ def get_goods_data(obj_list):
     stroki = obj_list
     sids = sid_gener(stroki)   # Получаем все артиклы без дублей
 
-    sort_art = art_sort(sids)  # Сортируем артиклы по 1000
+    sort_art = art_sort(sids)  # Сортируем артиклы
+
 
     slovar = {}
     for x in sort_art:
         arttiklis = ''.join(str(x).replace(' ', '').replace('[', '').replace(']', ''))
         data = sima_api(arttiklis)
         slovar.update(data)
+        time.sleep(1)
 
     sort = []
     for i in slovar.get('items'):
@@ -206,11 +210,10 @@ def order_amount(sorted_list):
                 for cell, name in zip(cell_list, namers):
                     cell.value = name
                 i.sheet.update_cells(cell_list)
-                time.sleep(0.2)
                 default_format = CellFormat(backgroundColor=color(30, 10, 10), textFormat=textFormat(bold=True))
                 format_cell_range(sheet, 'K{}:L{}'.format(i.str_number, i.str_number), default_format)
                 SUM = 0
-                time.sleep(0.6)
+                time.sleep(0.8)
 
     with Pool(4) as p:
         p.map(core, sorted_list)

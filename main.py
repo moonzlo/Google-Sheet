@@ -127,27 +127,28 @@ class Stroka(object):
                         #  Окращивает линию в зеленый
                         default_format = CellFormat(backgroundColor=color(250, 10, 0), textFormat=textFormat(bold=False))
                         format_cell_range(self.sheet, table_numbers, default_format)
-                        time.sleep(0.6)
+                        time.sleep(0.8)
                     elif int(self.status) == 2:
 
                         default_format = CellFormat(backgroundColor=color(100,1,250), textFormat=textFormat(bold=False))
                         format_cell_range(self.sheet, table_numbers, default_format)
-                        time.sleep(0.6)
+                        time.sleep(0.8)
 
 
                 elif status == False:
                     # Если НЕ хватает для выкупа.
                     default_format = CellFormat(backgroundColor=color(1, 2, 0), textFormat=textFormat(bold=False))
                     format_cell_range(self.sheet, table_numbers, default_format)
-                    time.sleep(0.6)
+                    time.sleep(0.8)
 
                 # Проверка на товар партнёра
                 elif data.get('is_remote_store') == 1:
                     default_format = CellFormat(backgroundColor=color(250, 10, 10), textFormat=textFormat(bold=False))
                     format_cell_range(self.sheet, table_numbers, default_format)
-                    time.sleep(0.6)
-            except:
-                pdb.set_trace()
+                    time.sleep(0.8)
+            except Exception as error:
+                print(error)
+
 
 
         else:
@@ -155,7 +156,7 @@ class Stroka(object):
             self.unit_item = 0
             default_format = CellFormat(backgroundColor=color(10, 0, 0), textFormat=textFormat(bold=True))
             format_cell_range(self.sheet, table_numbers, default_format)
-            time.sleep(0.6)
+            time.sleep(0.8)
 
 
 
@@ -238,7 +239,6 @@ klaster = group_data(factory)  # Возвращает список из клас
 def table_update(table, spisok):
     try:
         stop = len(spisok) + 5
-        print(stop)
         value = f'A6:M{stop}'
         cell_list = table.range(value)
         num1 = 0
@@ -281,14 +281,6 @@ table_update(deck1, factory)
 
 order_amount(klaster)  # Подсчитывает суммы, вносит изменения в таблицу.
 
-# Обновляем все строки.
-
-# def multi(elem):
-#     elem.table_update()
-#
-#
-# with Pool(4) as p:
-#     p.map(multi, factory)
 
 
 
