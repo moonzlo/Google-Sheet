@@ -3,3 +3,5 @@
 /login.json
 
 \.idea/
+
+venv/

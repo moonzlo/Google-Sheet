@@ -1,41 +1,18 @@
-import gspread
-import time
+#!/venv/bin/ python
+
 from oauth2client.service_account import ServiceAccountCredentials
-import pprint
-from gspread_formatting import *
-import re
-import json
-import requests
-from bs4 import BeautifulSoup
 from func import *
-from multiprocessing.dummy import Pool as ThreadPool
+from multiprocessing.dummy import Pool
+import gc
 
 
-start = time.time()
-def get_html(url):
-    agent = 'Mozilla/5.0 (Windows NT 6.0) AppleWebKit/536.5 (KHTML, like Gecko) Chrome/19.0.1084.52 Safari/536.5'
-    headers = {'accept': '*/*',
-               'user-agent': agent}
-    session = requests.Session()  # Иметирует сессию клиента.
-    request = session.get(url, headers=headers)
-
-
-    return request.content
-
-
-def get_sheet():
-    '''отдаёт список с словарями, количество словарей равно количесту заполненных строк'''
+def get_sheet(tokken, sheet_name, table_name):
+    """отдаёт экземпляр доски, полученый по токкену"""
 
     scope = ['https://www.googleapis.com/auth/drive']
-
-    creds = ServiceAccountCredentials.from_json_keyfile_name('login.json', scope)
+    creds = ServiceAccountCredentials.from_json_keyfile_name(tokken, scope)
     client = gspread.authorize(creds)
-
-    sheet = client.open('test1').sheet1
-
-    leg = sheet.get_all_records()  # Список внутри которого словари (количество словареий равно кличеству строк)
-    mass = leg[4:]  # Пропускаем пустые строки
-
+    sheet = client.open(sheet_name).worksheet(table_name)
     return sheet
 
 
@@ -51,8 +28,8 @@ class Stroka(object):
     def __init__(self, dictionary, deck):
         '''Принимает словарь из списка открытого json файла, задает базовые значения классу.'''
 
-
         self.sheet = deck  # Объект доски.
+
         self.time = dictionary.get('Отметка времени')
         self.name = dictionary.get('Фамилия и имя')
         self.doing = dictionary.get('Дейсвтие')
@@ -69,23 +46,16 @@ class Stroka(object):
         self.notice = dictionary.get('Примечание')
         self.delivery = dictionary.get('Цена за доставку (если есть)')
         self.str_number = dictionary.get('Строка')
-
-        # self.klaster = dictionary.get(keys[13])  # Параметр для заглушки, хранит имя кластера
-
+        self.status = dictionary.get('Состояние')
 
     def table_update(self):
         '''Данный метод записывает данные непосредственно в таблицу'''
+        time.sleep(0.2)
 
-        scope = ['https://www.googleapis.com/auth/drive']
-        # Авторизация и получения доступа к доске.
-        creds = ServiceAccountCredentials.from_json_keyfile_name('login.json', scope)
-        client = gspread.authorize(creds)
-        sheet = client.open('test1').sheet1
         namers = [self.time, self.name, self.doing, self.items_name, self.article, self.item_url, self.unit_item,
                   self.item_value, self.min_value, self.delivery, '', '', self.notice]
 
         if bool(self.name) != False:
-
 
             cell_list = self.sheet.range('A{}:M{}'.format(self.str_number, self.str_number))
 
@@ -98,118 +68,257 @@ class Stroka(object):
 
 
 
-    def product_name_update(self):
-        '''Метод получает полное название + цену товара, и обновляет их в параметрах экземпляра класса'''
-
-        base = 'https://www.sima-land.ru/{}'.format(self.article)
-        html = get_html(base)
-        soup = BeautifulSoup(html, 'html.parser')
-        table_numbers = 'A{}:M{}'.format(self.str_number, self.str_number)
-
-        # Проверям на товар партнёра
+    def product_name_update(self, sort_dict, factory):
         try:
-            tag = soup.find('div', class_='flags').find_all('span')
-
-            tag_list = []
-
-            for i in tag:
-                par = i.text.strip()
-                tag_list.append(par)
-
+            """Данный метод получает данные о товаре (если он в наличии) обновляет"""
             table_numbers = 'A{}:M{}'.format(self.str_number, self.str_number)
+            arrticle = int(self.article)
 
-            if 'Товар партнёра' in tag_list:
-                # Если тэг Товар партнёра Найден, окрашивает в берюзовый всю строку.
-                default_format = CellFormat(backgroundColor=color(250, 10, 10), textFormat=textFormat(bold=False))
-                format_cell_range(self.sheet, table_numbers, default_format)
+            if arrticle in sort_dict:
+                data = sort_dict.get(arrticle)
 
+                # Правильная ссылка на товар
+                self.item_url = f'https://www.sima-land.ru/{self.article}'
+
+                #  Обвноляем цену, имя, и минимальный выкуп
+                self.unit_item = data.get('price')
+                self.items_name = data.get('name')
+                self.min_value = data.get('qty_rules')
+
+                # Проверка цены за доставку, если НЕ указана то проверям статус.
+                if bool(self.delivery) == False:
+                    deli_status = data.get('is_free_delivery')
+                    if deli_status == True:
+                        self.delivery = 'Бесплатная'
+                    else:
+                        self.delivery = 'Платная'
+
+                # Проверка на выкуп
+                def sverka(article, min_value, item_value):
+                    artikl = article
+                    min = min_value.split()
+
+                    all_art = 0
+                    all_art += item_value
+
+                    for i in factory:
+                        if i.article == artikl:  # Ищем такой же артикл в таблице.
+                            # Если нашли совпадение по артиклу, добавим столько сколько хочет купить человек
+                            all_art += int(i.item_value)
+
+                    if all_art >= int(min[1]):
+                        return True
+
+                    elif int(min[1]) == 1:
+                        return True
+
+                    else:
+                        return False
+
+                # Проверка, достаточно ли товара для выкупа.
+                status = sverka(self.article, self.min_value, self.item_value)
+                try:
+                    if bool(self.status) == True:
+                        if int(self.status) == 1:
+                            #  Окращивает линию в зеленый
+                            time.sleep(0.8)
+                            default_format = CellFormat(backgroundColor=color(250, 10, 0), textFormat=textFormat(bold=False))
+                            format_cell_range(self.sheet, table_numbers, default_format)
+                        elif int(self.status) == 2:
+
+                            time.sleep(0.8)
+                            default_format = CellFormat(backgroundColor=color(100,1,250), textFormat=textFormat(bold=False))
+                            format_cell_range(self.sheet, table_numbers, default_format)
+
+
+                    elif status == False:
+                        # Если НЕ хватает для выкупа.
+                        time.sleep(0.8)
+                        default_format = CellFormat(backgroundColor=color(1, 2, 0), textFormat=textFormat(bold=False))
+                        format_cell_range(self.sheet, table_numbers, default_format)
+                        time.sleep(0.8)
+                    elif int(self.status) == 2:
+
+                    # Проверка на товар партнёра
+                    elif data.get('is_remote_store') == 1:
+                        time.sleep(0.8)
+                        default_format = CellFormat(backgroundColor=color(250, 10, 10), textFormat=textFormat(bold=False))
+                        format_cell_range(self.sheet, table_numbers, default_format)
+                        time.sleep(0.8)
+
+                except Exception as error:
+                    print(error)
+
+                elif status == False:
+                    # Если НЕ хватает для выкупа.
+                    default_format = CellFormat(backgroundColor=color(1, 2, 0), textFormat=textFormat(bold=False))
+                    format_cell_range(self.sheet, table_numbers, default_format)
+                    time.sleep(0.8)
+
+                # Проверка на товар партнёра
+                elif data.get('is_remote_store') == 1:
+                    default_format = CellFormat(backgroundColor=color(250, 10, 10), textFormat=textFormat(bold=False))
+                    format_cell_range(self.sheet, table_numbers, default_format)
+                    time.sleep(0.8)
+            except Exception as error:
+                print(error)
+
+
+
+        else:
+            #  Если товар НЕ найден в списке артиклов, значит его НЕТ в наличии.
+            self.unit_item = 0
+            default_format = CellFormat(backgroundColor=color(10, 0, 0), textFormat=textFormat(bold=True))
+            format_cell_range(self.sheet, table_numbers, default_format)
+            time.sleep(0.8)
+
+
+
+
+def main():
+    start = time.time()
+
+    form_url = '14xEH6imVJgBJKndemdysvTu9olMJEzv0cz62y9ziBdw'
+    chrome_profile = '/home/moonzlo/PycharmProjects/Google-Sheet/'
+    webriver_route = '/home/moonzlo/PycharmProjects/Google-Sheet/chromedriver'
+    tokken_route = '/home/moonzlo/PycharmProjects/Google-Sheet/'
+    sheet_name = 'test1'  # Имя самой таблицы
+    table_name = 'test'  # Имя таблицы внутри
+
+    # Блокируем возможность добавлять данные в таблицу
+    block_access(webriver_route, chrome_profile, form_url)
+
+    logins = [tokken_route + 'login1.json', tokken_route + 'login2.json', tokken_route + 'login3.json',
+              tokken_route + 'login4.json', ]
+
+    deck1 = get_sheet(logins[0], sheet_name, table_name)
+    deck2 = get_sheet(logins[1], sheet_name, table_name)
+    deck3 = get_sheet(logins[2], sheet_name, table_name)
+    deck4 = get_sheet(logins[3], sheet_name, table_name)
+
+    leg = deck1.get_all_records()  # Список внутри которого словари (количество словареий равно кличеству строк)
+    mass = leg[4:]  # Пропускаем пустые строки
+
+    # Инициализирует таблицу, записывая отсортированные данные в json iter_sort.json
+    table_data = initor(mass)  # Получем список словарей (всех строк таблицы)
+
+    def str_generator(table_data):
+        '''Данная функция служит фабрикой, оборачивая каждую строку таблицы в классы Strok'''
+
+        class_list = []
+        vibor = int(0)
+        for i in table_data:
+            if vibor == 0:
+                data = Stroka(i, deck1)
+                class_list.append(data)
+                vibor += 1
+            elif vibor == 1:
+                data = Stroka(i, deck2)
+                class_list.append(data)
+                vibor += 1
+
+            elif vibor == 2:
+                data = Stroka(i, deck3)
+                class_list.append(data)
+                vibor += 1
+
+            else:
+                data = Stroka(i, deck4)
+                class_list.append(data)
+                vibor = 0
+
+        return class_list
+
+    # Фабрика, генератор экземпляров строки.
+    factory = str_generator(table_data)
+
+    # Очищаем все строки.
+    def_table(deck1, factory)
+
+    sorted_dict = get_goods_data(factory)
+
+    def multi_update(obj):
+
+        if bool(obj.name) != False:
+            obj.product_name_update(sorted_dict, factory)
+
+    with Pool(4) as p:
+        p.map(multi_update, factory)
+
+    # Кластеризуем экземпляры класса, и обновляем сумму.
+    klaster = group_data(factory)  # Возвращает список из кластеров (экземпляров класса). [[Вася пупкин],[Вася Петров]]
+
+    def table_update(table, spisok):
+        try:
+            stop = len(spisok) + 5
+            value = f'A6:N{stop}'
+            cell_list = table.range(value)
+            num1 = 0
+            num2 = 0
+
+            for cell in cell_list:
+                stroka = spisok[num1]
+                namers = [stroka.time, stroka.name, stroka.doing, stroka.items_name, stroka.article, stroka.item_url,
+                          stroka.unit_item, stroka.item_value, stroka.min_value, stroka.delivery, '', '', stroka.notice,
+                          stroka.status]
+                namers2 = ['', '', '', '', '', '', '', '', '', '', '', '', '', '']
+
+                if bool(namers[1]) == True:
+
+                    if num2 != 13:
+                        cell.value = namers[num2]
+                        num2 += 1
+                    else:
+                        num2 = 0
+                        num1 += 1
+                        cell.value = namers[13]
+
+                else:
+                    if num2 != 13:
+                        cell.value = namers2[num2]
+                        num2 += 1
+                    else:
+                        num2 = 0
+                        num1 += 1
+                        cell.value = namers2[13]
+
+            table.update_cells(cell_list)
 
         except Exception as error:
-            print('Ошибка тута',error)
+            print(error)
 
-        # Обновляем название и цену
-        try:
-            price = soup.find('span', class_='price__val').find('span').text
+    table_update(deck1, factory)
 
-            a = re.findall(r'\d+', '{}'.format(price))
-            num = str().join(a)
-            self.unit_item = int(num)
+def table_update(table, spisok):
+    try:
+        stop = len(spisok) + 5
+        value = f'A6:M{stop}'
+        cell_list = table.range(value)
+        num1 = 0
+        num2 = 0
 
-            price_name = soup.find('div', class_='title').find('h1')
-            for i in price_name:
-                self.items_name = i
-        except AttributeError:
-            self.unit_item = 'Ошибка'
-            self.items_name = 'Ошибка артикла'
+    # Разблокируем возможность добавлять данные в таблицу
+    block_access(webriver_route, chrome_profile, form_url)
+    return time.time() - start
 
-        # Проверяем на наличие товара.
-        try:
-            status = soup.find('td', class_='a_m purchase__cell purchase__cell_zero').text.strip()
-            if status == 'Нет в наличии':
-                default_format = CellFormat(backgroundColor=color(1, 0, 240), textFormat=textFormat(bold=False))
-                format_cell_range(self.sheet, table_numbers, default_format)
-        except AttributeError:
-            pass
 
+if __name__ == "__main__":
+    try:
+        print(main())
+    except Exception as error:
+        print(error)
+        # import requests
+        # get = requests.get(f'https://api.telegram.org/bot718325311:AAGQ0ixXKaV9lKGJZLHWr5eAhKrL1gOpeCc/sendMessage?chat_id=191494526&text={error}')
 
 
 
 
-# -----------------ЗАПУСК
-deck = get_sheet()
-leg = deck.get_all_records()  # Список внутри которого словари (количество словареий равно кличеству строк)
-mass = leg[4:]  # Пропускаем пустые строки
-
-deleter = removal(mass)
-
-
-# Инициализирует таблицу, записывая отсортированные данные в json iter_sort.json
-table_data = initor(deleter)  # Получем список словарей (всех строк таблицы)
-
-# Очищаем все строки.
-def_table(deck, leg)
-
-# Окрашиваем все строки в белый.
-def_color(deck,leg)
-
-
-def str_generator(table_data):
-    '''Данная функция служит фабрикой, оборачивая каждую строку таблицы в классы Strok'''
-    class_list = []
-
-    for i in table_data:
-        # Класс принимает два аргмента, словрь с данынми о строке, и текущую доску.
-        data = Stroka(i, deck)
-        # Обновляем все базовые значения класса.
-        if bool(data.name) != False:
-            data.product_name_update()  # Получаем и обновляем настоящие имя и цену товара.
-
-        class_list.append(data)
-
-
-    return class_list
-
-# Фабрика, генератор экземпляров строки.
-factory = str_generator(table_data)
+order_amount(klaster)  # Подсчитывает суммы, вносит изменения в таблицу.
 
 
 
-# Кластеризуем экземпляры класса, и обновляем сумму.
-klaster = group_data(factory)  # Возвращает список из кластеров (экземпляров класса). [[Вася пупкин],[Вася Петров]]
-order_amount(klaster, deck)  # Подсчитывает суммы, вносит изменения в таблицу.
-
-# Обновляем все строки.
-pool = ThreadPool(4)     # создаем 4 потока - по количеству ядер CPU
-def multi(elem):
-    elem.table_update()
-
-results = pool.map(multi, factory)
-pool.close()
-pool.join()
 
 
 
-# for st in factory:
-#     st.table_update()
-
+# block_access()
 print(time.time() - start)
