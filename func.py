@@ -26,17 +26,32 @@ def sid_gener(str_list):
         return value1
 
     except Exception as error:
-        print(error)
-
-
+        print('Ошибка внутри генерации артиклов | ', error)
 
 
 def sima_api(spisok_sto):
-    session = XMLSession()
-    r = session.get('https://www.sima-land.ru/api/v3/item/?per-page=?&sid={}'.format(spisok_sto))
-    a = r.json()  # Словаря с данными
+    """Функция служит для отправки артиклов к api сималжнда, получает json с данными о товарах"""
+    try:
 
-    return a
+        session = XMLSession()
+        r = session.get(f'https://www.sima-land.ru/api/v3/item/?per-page=?&sid={spisok_sto}')
+        r2 = session.get(f'https://www.sima-land.ru/api/v3/item/?is_remote_store=1&?per-page=?&sid={spisok_sto}')
+        a = r.json()  # Словаря с данными
+        b = r2.json()
+
+        sort_data = []
+        if len(a.get('items')) > 0:
+            for i in a.get('items'):
+                sort_data.append(i)
+
+        if len(b.get('items')) > 0:
+            for x in b.get('items'):
+                sort_data.append(x)
+
+        return sort_data
+
+    except Exception as error:
+        print('Ошибка внутри реквеста к симе | ', error)
 
 
 def art_sort(artikles):
@@ -46,17 +61,18 @@ def art_sort(artikles):
     value = []
 
     for i in artikles:
-        if schetcik != 1000:
+        if schetcik != 300:
             spisok.append(i)
             schetcik += 1
         else:
-            value.append(','.join(spisok))
-            spisok.clear()
+
+            value.append(str(spisok))
             schetcik = 0
+            spisok.clear()
 
-    value.append(spisok)
-
+    value.append(str(spisok))
     return value
+
 
 def get_goods_data(obj_list):
     """Получаем и обрабатываем данные с api сималэнда по списку артиклов, отдаём список товаров в НАЛИЧИИ"""
@@ -64,21 +80,22 @@ def get_goods_data(obj_list):
     stroki = obj_list
     sids = sid_gener(stroki)   # Получаем все артиклы без дублей
 
-    sort_art = art_sort(sids)  # Сортируем артиклы по 1000
+    sort_art = art_sort(sids)  # Сортируем артиклы
 
-    slovar = {}
+    slovar = []
     for x in sort_art:
         arttiklis = ''.join(str(x).replace(' ', '').replace('[', '').replace(']', ''))
         data = sima_api(arttiklis)
-        slovar.update(data)
+        slovar.extend(data)
+        time.sleep(1)
 
-    sort = []
-    for i in slovar.get('items'):
-        sort.append(i)
+    # sort = []
+    # for i in slovar.get('items'):
+    #     sort.append(i)
 
     dict_sort = {}
 
-    for x in sort:
+    for x in slovar:
         sid = x.get('sid')
         value = {sid: x}
         dict_sort.update(value)
@@ -86,27 +103,25 @@ def get_goods_data(obj_list):
     return dict_sort
 
 
-def block_access():  # Блокирует доступ гугл форме.
+def block_access(webriver_pach, profile, url):  # Блокирует доступ гугл форме.
     """Смысл функции ограничить возмонжость клиентов добавлять контент, во время работы скрипта"""
 
     options = webdriver.ChromeOptions()
     options.add_argument('headless')  # Без GUI
     options.add_argument('--no-sandbox')
     options.add_argument('--disable-dev-shm-usage')
-    options.add_argument(r"user-data-dir=/home/moonz/git/Google-Sheet/profile/")
-    driver = webdriver.Chrome(executable_path="/home/moonz/chromedriver", chrome_options=options)
+    options.add_argument(f"user-data-dir={profile}")
+    driver = webdriver.Chrome(executable_path=f"{webriver_pach}", chrome_options=options)
 
     # Адресс формы
-    driver.get("https://docs.google.com/forms/d/14xEH6imVJgBJKndemdysvTu9olMJEzv0cz62y9ziBdw/edit#responses")
-
-
+    # Почта бота (simaland.bot@gmail.com)
+    driver.get(f"https://docs.google.com/forms/d/{url}/edit#responses")
 
     try:
         driver.find_element_by_xpath(u"(.//*[normalize-space(text()) and normalize-space(.)='Принимать ответы'])[1]/following::div[6]").click()
 
-
     except Exception as error:
-        print('ОШИБКА ! | ',error)
+        print('Ошибка внутри блокировки | ',error)
 
     finally:
         driver.close()
@@ -114,20 +129,23 @@ def block_access():  # Блокирует доступ гугл форме.
 
 
 def exchange_rate():
-    '''Получает актуальный курс рос.рубля к бел.рублю'''
+    """Получает актуальный курс рос.рубля к бел.рублю"""
     html = get_htmls()
     value = []
+    try:
+        doc = html5lib.parse(html, treebuilder="lxml", namespaceHTMLElements=False)
+        for node in doc.iterfind("//*span[@class='cc-result']"):
+            value.append(node.text)
 
-    doc = html5lib.parse(html, treebuilder="lxml", namespaceHTMLElements=False)
-    for node in doc.iterfind("//*span[@class='cc-result']"):
-        value.append(node.text)
+        kurs = value[1].split()
+        return kurs[0]
 
-    kurs = value[1].split()
-    return kurs[0]
+    except Exception as error:
+        print('Ошибка при получении курса бел.рубля |', error)
 
 
 def final_price(exchange_rate, rub):
-
+    """Функция подсчёта финальной стоимости заказа (человека), с умножением и конвертацией"""
 
     price = float(exchange_rate)*rub
 
@@ -139,6 +157,8 @@ def final_price(exchange_rate, rub):
 
 
 def get_htmls():
+    """Получание html кода страницы с курсом бел рубля к рус рублю"""
+
     url = 'https://rub.ru.currencyrate.today/byn'
 
     headers = {'accept': '*/*',
@@ -150,13 +170,9 @@ def get_htmls():
     return request.content
 
 
-
-# Функция принимает на вход список из экземпляров класса Stroka
-
 def group_data(factory_list):
-    '''Цель данной функции, объеденить строки в списки, для удобства взаимодействия и расчётов'''
+    """Цель данной функции, объеденить строки в списки, для удобства взаимодействия и расчётов"""
     sorted_list = []  # Список кластеризованных экземпляров класса Stroka, в списки.
-
     klaster = []
 
     for x in factory_list:
@@ -170,12 +186,9 @@ def group_data(factory_list):
     return sorted_list
 
 
-# Запускать в самом конце.
-
 def order_amount(sorted_list):
-    '''Данная функция сумирует все цены, и выводит общую сумму заказа'''
+    """Данная функция сумирует все цены, и выводит общую сумму заказа"""
     kurs = exchange_rate()
-
 
     def core(li):
 
@@ -200,26 +213,27 @@ def order_amount(sorted_list):
 
 
             else:
+                time.sleep(0.8)
                 total = final_price(kurs, SUM)
                 namers = [SUM, total]
                 cell_list = i.sheet.range('K{}:L{}'.format(i.str_number, i.str_number))
                 for cell, name in zip(cell_list, namers):
                     cell.value = name
                 i.sheet.update_cells(cell_list)
-                time.sleep(0.2)
                 default_format = CellFormat(backgroundColor=color(30, 10, 10), textFormat=textFormat(bold=True))
                 format_cell_range(sheet, 'K{}:L{}'.format(i.str_number, i.str_number), default_format)
                 SUM = 0
-                time.sleep(0.6)
-
-    with Pool(4) as p:
-        p.map(core, sorted_list)
+    try:
+        with Pool(4) as p:
+            p.map(core, sorted_list)
+    except Exception as error:
+        print('Ошибка внутри потока обновления цены | ', error)
 
 
 def def_table(deck, table_data):
-    '''Цель данной функции, предварительная очистка всего поля от всех данных'''
+    """Цель данной функции, предварительная очистка всего поля от всех данных"""
     stop = len(table_data) + 5
-    value = 'A6:M{}'.format(stop)
+    value = 'A6:N{}'.format(stop)
     cell_list = deck.range(value)
 
     for cell in cell_list:
@@ -262,9 +276,7 @@ def initor(sheet):
         if bool(a) == True:
             sorted_list_new.append(c)
 
-
     sorted_list_new.sort(key=itemgetter('Фамилия и имя'))
-
 
     def work_list(list_dict):
         # Пустая строка разделитель.
@@ -303,7 +315,6 @@ def initor(sheet):
                 a.update({'Заглушка для:': list_dict[i].get('Фамилия и имя')})
                 sorted_dict_list.append(a)
 
-
         return sorted_dict_list  # Возвращаем отсортированные список словарей + загрулшки.
 
     # Передаем в функцию отсортированные по алфовиту, получаем записанные файл и список с загрушками.
@@ -315,9 +326,5 @@ def initor(sheet):
     for i, c in enumerate(sorted_list):
         sorted_list[i].update({'Строка':nums})
         nums += 1
-
-    # Записываем пронумерованные строки в файл.
-    # with open('iter_sort.json', 'w') as file:
-    #     json.dump(sorted_list, file, indent=2, ensure_ascii=False)
 
     return sorted_list
