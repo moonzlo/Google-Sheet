@@ -23,6 +23,7 @@ def sid_gener(str_list):
         value = set(sid_list)
         value1 = list(value)
 
+
         return value1
 
     except Exception as error:
@@ -39,14 +40,11 @@ def sima_api(spisok_sto):
         a = r.json()  # Словаря с данными
         b = r2.json()
 
-        sort_data = []
-        if len(a.get('items')) > 0:
-            for i in a.get('items'):
-                sort_data.append(i)
-
-        if len(b.get('items')) > 0:
-            for x in b.get('items'):
-                sort_data.append(x)
+def sima_api(spisok_sto):
+    session = XMLSession()
+    r = session.get('https://www.sima-land.ru/api/v3/item/?per-page=?&sid={}'.format(spisok_sto))
+    a = r.json()  # Словаря с данными
+    return a
 
         return sort_data
 
@@ -70,7 +68,9 @@ def art_sort(artikles):
             schetcik = 0
             spisok.clear()
 
+
     value.append(str(spisok))
+
     return value
 
 
@@ -82,11 +82,12 @@ def get_goods_data(obj_list):
 
     sort_art = art_sort(sids)  # Сортируем артиклы
 
-    slovar = []
+
+    slovar = {}
     for x in sort_art:
         arttiklis = ''.join(str(x).replace(' ', '').replace('[', '').replace(']', ''))
         data = sima_api(arttiklis)
-        slovar.extend(data)
+        slovar.update(data)
         time.sleep(1)
 
     # sort = []
@@ -223,11 +224,7 @@ def order_amount(sorted_list):
                 default_format = CellFormat(backgroundColor=color(30, 10, 10), textFormat=textFormat(bold=True))
                 format_cell_range(sheet, 'K{}:L{}'.format(i.str_number, i.str_number), default_format)
                 SUM = 0
-    try:
-        with Pool(4) as p:
-            p.map(core, sorted_list)
-    except Exception as error:
-        print('Ошибка внутри потока обновления цены | ', error)
+                time.sleep(0.8)
 
 
 def def_table(deck, table_data):

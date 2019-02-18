@@ -136,28 +136,41 @@ class Stroka(object):
                         time.sleep(0.8)
                         default_format = CellFormat(backgroundColor=color(1, 2, 0), textFormat=textFormat(bold=False))
                         format_cell_range(self.sheet, table_numbers, default_format)
+                        time.sleep(0.8)
+                    elif int(self.status) == 2:
 
                     # Проверка на товар партнёра
                     elif data.get('is_remote_store') == 1:
                         time.sleep(0.8)
                         default_format = CellFormat(backgroundColor=color(250, 10, 10), textFormat=textFormat(bold=False))
                         format_cell_range(self.sheet, table_numbers, default_format)
+                        time.sleep(0.8)
 
                 except Exception as error:
                     print(error)
 
-            else:
-                #  Если товар НЕ найден в списке артиклов, значит его НЕТ в наличии.
-                self.unit_item = 0
-                time.sleep(0.9)
-                default_format = CellFormat(backgroundColor=color(10, 0, 0), textFormat=textFormat(bold=True))
-                format_cell_range(self.sheet, table_numbers, default_format)
+                elif status == False:
+                    # Если НЕ хватает для выкупа.
+                    default_format = CellFormat(backgroundColor=color(1, 2, 0), textFormat=textFormat(bold=False))
+                    format_cell_range(self.sheet, table_numbers, default_format)
+                    time.sleep(0.8)
 
-        except Exception as error:
-            print('Я строка', self.str_number)
-            print('Случилась ошибка =( :', error)
+                # Проверка на товар партнёра
+                elif data.get('is_remote_store') == 1:
+                    default_format = CellFormat(backgroundColor=color(250, 10, 10), textFormat=textFormat(bold=False))
+                    format_cell_range(self.sheet, table_numbers, default_format)
+                    time.sleep(0.8)
+            except Exception as error:
+                print(error)
 
 
+
+        else:
+            #  Если товар НЕ найден в списке артиклов, значит его НЕТ в наличии.
+            self.unit_item = 0
+            default_format = CellFormat(backgroundColor=color(10, 0, 0), textFormat=textFormat(bold=True))
+            format_cell_range(self.sheet, table_numbers, default_format)
+            time.sleep(0.8)
 
 
 
@@ -276,7 +289,13 @@ def main():
 
     table_update(deck1, factory)
 
-    order_amount(klaster)  # Подсчитывает суммы, вносит изменения в таблицу.
+def table_update(table, spisok):
+    try:
+        stop = len(spisok) + 5
+        value = f'A6:M{stop}'
+        cell_list = table.range(value)
+        num1 = 0
+        num2 = 0
 
     # Разблокируем возможность добавлять данные в таблицу
     block_access(webriver_route, chrome_profile, form_url)
@@ -292,3 +311,14 @@ if __name__ == "__main__":
         # get = requests.get(f'https://api.telegram.org/bot718325311:AAGQ0ixXKaV9lKGJZLHWr5eAhKrL1gOpeCc/sendMessage?chat_id=191494526&text={error}')
 
 
+
+
+order_amount(klaster)  # Подсчитывает суммы, вносит изменения в таблицу.
+
+
+
+
+
+
+# block_access()
+print(time.time() - start)
